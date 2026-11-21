@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ManaStat — MTG Deck & Playgroup Tracker</title>
+  <style>
+    :root {
+      --bg: #0f1219;
+      --card: #181d29;
+      --border: #2a3245;
+      --text: #eef2fa;
+      --muted: #9aa5be;
+      --accent: #2e86de;
+      --accent-hover: #3b96f2;
+      --green: #2ea043;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 48px 20px;
+    }
+    header {
+      text-align: center;
+      padding: 40px 0 56px;
+    }
+    .badge {
+      display: inline-block;
+      background: #1e293b;
+      color: #8ab4f8;
+      border: 1px solid #334155;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    h1 {
+      font-size: 3rem;
+      letter-spacing: -0.02em;
+      margin-bottom: 16px;
+    }
+    .subtitle {
+      font-size: 1.2rem;
+      color: var(--muted);
+      max-width: 640px;
+      margin: 0 auto 32px;
+    }
+    .btn-download {
+      display: inline-block;
+      background-color: var(--green);
+      color: #ffffff;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 1.05rem;
+      padding: 14px 28px;
+      border-radius: 10px;
+      transition: background 0.2s, transform 0.15s;
+    }
+    .btn-download:hover {
+      background-color: #36b54e;
+      transform: translateY(-2px);
+    }
+    .platform-note {
+      display: block;
+      margin-top: 10px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+      margin-top: 24px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+    }
+    .card h3 {
+      margin-bottom: 10px;
+      font-size: 1.15rem;
+      color: #ffffff;
+    }
+    .card p {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    footer {
+      text-align: center;
+      margin-top: 64px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <span class="badge">v5.0 • Windows Desktop App</span>
+      <h1>ManaStat</h1>
+      <p class="subtitle">
+        Track your Magic: The Gathering decks, playgroup match history, winrate progression, and card collection in one clean desktop hub.
+      </p>
+      <a class="btn-download" href="#LINK_DOWNLOAD_EXE">Download ManaStat for Windows (.exe)</a>
+      <span class="platform-note">Free beta • No Python installation required</span>
+    </header>
+
+    <section class="grid">
+      <div class="card">
+        <h3>Deck & Winrate Analytics</h3>
+        <p>Log matches over time, visualize winrate curves, and see how deck edits impact your performance.</p>
+      </div>
+      <div class="card">
+        <h3>Playgroups & Leaderboards</h3>
+        <p>Create private pods with friends, track multiplayer games, and check head-to-head matchup stats.</p>
+      </div>
+      <div class="card">
+        <h3>Scryfall & Collection Sync</h3>
+        <p>Import lists from Moxfield or ManaBox, track specific printings and foils, and monitor estimated deck value.</p>
+      </div>
+    </section>
+
+    <footer>
+      ManaStat is an unofficial fan project not affiliated with Wizards of the Coast. Card data &amp; images provided by Scryfall.
+    </footer>
+  </div>
+</body>
+</html>
