@@ -1,140 +1,183 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ManaStat — MTG Deck & Playgroup Tracker</title>
-  <style>
-    :root {
-      --bg: #0f1219;
-      --card: #181d29;
-      --border: #2a3245;
-      --text: #eef2fa;
-      --muted: #9aa5be;
-      --accent: #2e86de;
-      --accent-hover: #3b96f2;
-      --green: #2ea043;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-    }
-    .container {
-      max-width: 960px;
-      margin: 0 auto;
-      padding: 48px 20px;
-    }
-    header {
-      text-align: center;
-      padding: 40px 0 56px;
-    }
-    .badge {
-      display: inline-block;
-      background: #1e293b;
-      color: #8ab4f8;
-      border: 1px solid #334155;
-      padding: 4px 12px;
-      border-radius: 999px;
-      font-size: 13px;
-      font-weight: 600;
-      margin-bottom: 16px;
-    }
-    h1 {
-      font-size: 3rem;
-      letter-spacing: -0.02em;
-      margin-bottom: 16px;
-    }
-    .subtitle {
-      font-size: 1.2rem;
-      color: var(--muted);
-      max-width: 640px;
-      margin: 0 auto 32px;
-    }
-    .btn-download {
-      display: inline-block;
-      background-color: var(--green);
-      color: #ffffff;
-      text-decoration: none;
-      font-weight: 700;
-      font-size: 1.05rem;
-      padding: 14px 28px;
-      border-radius: 10px;
-      transition: background 0.2s, transform 0.15s;
-    }
-    .btn-download:hover {
-      background-color: #36b54e;
-      transform: translateY(-2px);
-    }
-    .platform-note {
-      display: block;
-      margin-top: 10px;
-      font-size: 0.85rem;
-      color: var(--muted);
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 20px;
-      margin-top: 24px;
-    }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 24px;
-    }
-    .card h3 {
-      margin-bottom: 10px;
-      font-size: 1.15rem;
-      color: #ffffff;
-    }
-    .card p {
-      color: var(--muted);
-      font-size: 0.95rem;
-    }
-    footer {
-      text-align: center;
-      margin-top: 64px;
-      padding-top: 24px;
-      border-top: 1px solid var(--border);
-      color: var(--muted);
-      font-size: 0.85rem;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#12151c" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>ManaStat Companion</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <span class="badge">v5.0 • Windows Desktop App</span>
+  <div id="app">
+    <!-- LOGIN -->
+    <section id="login-view" class="card">
       <h1>ManaStat</h1>
-      <p class="subtitle">
-        Track your Magic: The Gathering decks, playgroup match history, winrate progression, and card collection in one clean desktop hub.
-      </p>
-      <a class="btn-download" href="#LINK_DOWNLOAD_EXE">Download ManaStat for Windows (.exe)</a>
-      <span class="platform-note">Free beta • No Python installation required</span>
-    </header>
-
-    <section class="grid">
-      <div class="card">
-        <h3>Deck & Winrate Analytics</h3>
-        <p>Log matches over time, visualize winrate curves, and see how deck edits impact your performance.</p>
-      </div>
-      <div class="card">
-        <h3>Playgroups & Leaderboards</h3>
-        <p>Create private pods with friends, track multiplayer games, and check head-to-head matchup stats.</p>
-      </div>
-      <div class="card">
-        <h3>Scryfall & Collection Sync</h3>
-        <p>Import lists from Moxfield or ManaBox, track specific printings and foils, and monitor estimated deck value.</p>
-      </div>
+      <p class="muted">Accedi con lo stesso account dell'app desktop.</p>
+      <label>Email</label>
+      <input id="email" type="email" placeholder="tu@esempio.com" autocomplete="email" />
+      <label>Password</label>
+      <input id="password" type="password" placeholder="••••••••" autocomplete="current-password" />
+      <button id="btn-login" class="btn primary">Accedi</button>
+      <p id="login-status" class="status"></p>
     </section>
 
-    <footer>
-      ManaStat is an unofficial fan project not affiliated with Wizards of the Coast. Card data &amp; images provided by Scryfall.
-    </footer>
+    <!-- APP PRINCIPALE -->
+    <main id="main-view" class="hidden">
+      <header class="topbar">
+        <div>
+          <strong>ManaStat</strong>
+          <span id="user-badge" class="badge"></span>
+        </div>
+        <button id="btn-logout" class="btn small">Esci</button>
+      </header>
+
+      <!-- TAB 1: MAZZI -->
+      <section id="tab-decks" class="tab-panel active">
+        <div id="decks-list-view" class="card">
+          <h2>I tuoi mazzi</h2>
+          <p class="muted">Tocca un mazzo per aprire la sua scheda e segnare una partita.</p>
+          <div id="decks-list-container" class="deck-cards-list"></div>
+          <p id="deck-list-status" class="status"></p>
+        </div>
+
+        <div id="deck-detail-view" class="hidden">
+          <div class="detail-header">
+            <button id="btn-back-to-decks" class="btn back-btn">← Tutti i mazzi</button>
+            <span class="muted">Scheda mazzo</span>
+          </div>
+
+          <div id="deck-detail-hero" class="detail-hero">
+            <div class="detail-hero-inner">
+              <h2 id="deck-detail-title">Mazzo</h2>
+              <span id="deck-detail-format" class="badge">Formato</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Registra partita</h3>
+            <div class="row-2">
+              <div>
+                <label>Partite giocate</label>
+                <input id="deck-matches" type="number" min="1" value="1" />
+              </div>
+              <div>
+                <label>Vittorie</label>
+                <input id="deck-wins" type="number" min="0" value="0" />
+              </div>
+            </div>
+
+            <label>Data</label>
+            <input id="deck-date" type="date" />
+
+            <button id="btn-save-deck-match" class="btn primary">Salva partita su mazzo</button>
+            <p id="deck-status" class="status"></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: GRUPPI -->
+      <section id="tab-groups" class="tab-panel">
+        <div id="groups-list-view" class="card">
+          <h2>I tuoi gruppi</h2>
+          <p class="muted">Seleziona un gruppo per inserire una partita.</p>
+          <div id="groups-list-container" class="group-list"></div>
+          <p id="group-list-status" class="status"></p>
+        </div>
+
+        <div id="group-detail-view" class="hidden">
+          <div class="detail-header">
+            <button id="btn-back-to-groups" class="btn back-btn">← Tutti i gruppi</button>
+            <span class="muted">Scheda gruppo</span>
+          </div>
+
+          <div class="card">
+            <h2 id="group-detail-title">Gruppo</h2>
+            <label>Partecipanti & Mazzi</label>
+            <div id="group-players-container"></div>
+
+            <label>Note (opzionali)</label>
+            <input id="group-notes" type="text" placeholder="Es. pod da 4, partita veloce..." />
+
+            <button id="btn-save-group-match" class="btn primary">Salva partita gruppo</button>
+            <p id="group-status" class="status"></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: SCANNER LIVE VIA SERVER PYTHON -->
+      <section id="tab-collection" class="tab-panel">
+        <div class="scanner-full-view">
+          <div class="camera-viewport">
+            <video id="scan-video" autoplay playsinline muted></video>
+            <canvas id="quad-overlay" class="quad-overlay"></canvas>
+
+            <div id="camera-placeholder" class="camera-placeholder">
+              <p class="muted">Fotocamera non attiva.</p>
+              <button id="btn-start-camera" type="button" class="btn primary">Attiva fotocamera</button>
+            </div>
+
+            <div class="camera-hud">
+              <span id="scan-state-badge" class="scan-badge">In attesa...</span>
+              <span id="rejected-count-badge" class="scan-badge secondary">Scartate: 0</span>
+            </div>
+          </div>
+
+          <div class="scanner-connection-bar">
+            <label for="scannerWsUrlInput">Server Scanner (WS / WSS)</label>
+           
+            <span id="scannerStatusBadge" class="status-badge disconnected">Disconnesso</span>
+            <button id="btnToggleScanner" type="button" class="btn small">Avvia Scanner</button>
+          </div>
+
+          <div class="camera-footer-bar">
+            <div class="scanner-controls-grid">
+              <select id="scan-finish-select">
+                <option value="normal">Normale</option>
+                <option value="foil">Foil</option>
+              </select>
+              <button id="btn-reset-rejected" type="button" class="btn small">Reset scartate</button>
+            </div>
+            <p id="collection-status" class="status"></p>
+          </div>
+
+          <!-- CARD PROPOSTA QUANDO VIENE RICONOSCIUTA UNA CARTA -->
+          <div id="proposal-modal" class="proposal-overlay hidden">
+            <div class="proposal-card">
+              <p id="proposal-match-source" class="muted">Carta rilevata</p>
+              <img id="proposal-img" src="" alt="Anteprima carta" class="proposal-img hidden" />
+              <h2 id="proposal-name">Nome carta</h2>
+              <p id="proposal-meta" class="muted"></p>
+
+              <label for="proposal-edition-select">Edizione</label>
+              <select id="proposal-edition-select">
+                <option value="">Nessuna edizione alternativa</option>
+              </select>
+
+              <div class="proposal-actions">
+                <button id="btn-proposal-no" type="button" class="btn danger-btn">No</button>
+                <button id="btn-proposal-yes" type="button" class="btn success-btn">Sì</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <canvas id="frame-send-canvas" class="hidden"></canvas>
+      </section>
+
+      <!-- NAVIGAZIONE IN BASSO -->
+      <nav class="bottom-nav">
+        <button class="nav-btn active" data-tab="tab-decks">Mazzi</button>
+        <button class="nav-btn" data-tab="tab-groups">Gruppi</button>
+        <button class="nav-btn" data-tab="tab-collection">Scanner</button>
+      </nav>
+    </main>
   </div>
+
+  <script src="app.js"></script>
 </body>
 </html>
