@@ -13,8 +13,10 @@ let groupMembers = [];
 let groupDecks = [];
 const artworkCache = new Map();
 
-// Configurazione WebSocket dello scanner Python (Render)
+// Configurazione Server Scanner Python (Render)
+const SCANNER_HTTP_BASE = "https://manastat-scanner-server.onrender.com";
 const DEFAULT_SCANNER_WS_URL = "wss://manastat-scanner-server.onrender.com/ws/scan";
+const STORAGE_SETS_KEY = "manastat_scanner_selected_sets";
 
 let cameraStream = null;
 let wsConn = null;
@@ -27,6 +29,20 @@ let pendingProposalCard = null;
 let proposalMatches = [];
 let lockedAfterConfirmCard = null;
 const rejectedCardKeys = new Set();
+
+// Stato filtro espansioni scanner
+let availableScannerSets = [];
+let setsLoaded = false;
+const selectedScannerSets = new Set(
+  (() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_SETS_KEY) || "[]");
+      return Array.isArray(saved) ? saved.map((s) => String(s).toUpperCase()) : [];
+    } catch {
+      return [];
+    }
+  })()
+);
 
 const PREFERRED_FORMATS = [
   "Commander",
@@ -88,6 +104,166 @@ function setScanStateBadge(text) {
   }
 }
 
+// ---- SELETTORE ESPANSIONI SCANNER (INIETTATO AUTOMATICAMENTE) ----
+function saveSelectedSetsToStorage() {
+  try {
+    localStorage.setItem(STORAGE_SETS_KEY, JSON.stringify(Array.from(selectedScannerSets)));
+  } catch {
+    // ignora
+  }
+}
+
+function sendSetFilterToWs() {
+  if (!wsConn || wsConn.readyState !== WebSocket.OPEN) return;
+  try {
+    wsConn.send(
+      JSON.stringify({
+        type: "set_filter",
+        sets: Array.from(selectedScannerSets),
+      })
+    );
+  } catch {
+    // ignora
+  }
+}
+
+function updateSetFilterSummary() {
+  const lbl = $("scanner-sets-summary");
+  if (!lbl) return;
+  if (selectedScannerSets.size === 0) {
+    lbl.textContent = "Tutte le espansioni";
+  } else if (selectedScannerSets.size <= 3) {
+    lbl.textContent = `Set: ${Array.from(selectedScannerSets).join(", ")}`;
+  } else {
+    lbl.textContent = `${selectedScannerSets.size} espansioni selezionate`;
+  }
+}
+
+function renderScannerSetsList() {
+  const listEl = $("scanner-sets-list");
+  if (!listEl) return;
+  const q = ($("scanner-sets-search")?.value || "").trim().toLowerCase();
+
+  if (!setsLoaded) {
+    listEl.innerHTML = `<div style="padding:8px;color:#94a3b8;font-size:12px;">Caricamento espansioni...</div>`;
+    return;
+  }
+
+  const filtered = availableScannerSets.filter((s) => {
+    if (!q) return true;
+    return s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q);
+  });
+
+  if (!filtered.length) {
+    listEl.innerHTML = `<div style="padding:8px;color:#94a3b8;font-size:12px;">Nessuna espansione trovata.</div>`;
+    return;
+  }
+
+  // Mostra prima i set già selezionati, poi gli altri (max 80 visibili per fluidità)
+  const ordered = filtered.slice().sort((a, b) => {
+    const aSel = selectedScannerSets.has(a.code) ? 0 : 1;
+    const bSel = selectedScannerSets.has(b.code) ? 0 : 1;
+    if (aSel !== bSel) return aSel - bSel;
+    return a.name.localeCompare(b.name);
+  });
+
+  listEl.innerHTML = ordered
+    .slice(0, 80)
+    .map((s) => {
+      const checked = selectedScannerSets.has(s.code) ? "checked" : "";
+      return `
+        <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:13px;cursor:pointer;">
+          <input type="checkbox" class="scanner-set-chk" value="${escapeHtml(s.code)}" ${checked} />
+          <span style="font-weight:700;color:#60a5fa;min-width:44px;">${escapeHtml(s.code)}</span>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(s.name)}</span>
+          <span style="color:#94a3b8;font-size:11px;">${s.count}</span>
+        </label>
+      `;
+    })
+    .join("");
+
+  listEl.querySelectorAll(".scanner-set-chk").forEach((chk) => {
+    chk.addEventListener("change", () => {
+      const code = String(chk.value || "").toUpperCase();
+      if (chk.checked) {
+        selectedScannerSets.add(code);
+      } else {
+        selectedScannerSets.delete(code);
+      }
+      saveSelectedSetsToStorage();
+      updateSetFilterSummary();
+      sendSetFilterToWs();
+    });
+  });
+}
+
+function ensureSetSelectorUi() {
+  const tab = $("tab-collection");
+  if (!tab || $("scanner-sets-box")) return;
+
+  const box = document.createElement("div");
+  box.id = "scanner-sets-box";
+  box.style.cssText =
+    "margin:10px 0;padding:10px 12px;border-radius:10px;background:rgba(15,23,42,0.85);border:1px solid rgba(148,163,184,0.22);";
+  box.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <button type="button" id="btn-toggle-sets-panel" style="background:none;border:none;color:#e2e8f0;font-weight:600;font-size:13px;cursor:pointer;text-align:left;padding:0;flex:1;">
+        🎯 Filtro Espansioni: <span id="scanner-sets-summary" style="color:#60a5fa;">Tutte le espansioni</span> ▾
+      </button>
+      <button type="button" id="btn-clear-scanner-sets" style="background:#1e293b;border:1px solid #334155;color:#cbd5e1;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;">
+        Tutte
+      </button>
+    </div>
+    <div id="scanner-sets-panel" class="hidden" style="margin-top:8px;">
+      <input id="scanner-sets-search" type="text" placeholder="Cerca espansione o codice (es. MH3, BLB, LTR)..." style="width:100%;box-sizing:border-box;padding:7px 10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#f8fafc;font-size:13px;margin-bottom:6px;" />
+      <div id="scanner-sets-list" style="max-height:190px;overflow-y:auto;border:1px solid #1e293b;border-radius:8px;background:#0b1120;"></div>
+    </div>
+  `;
+
+  // Inserisce il box subito in cima alla scheda Scanner
+  tab.insertBefore(box, tab.firstChild);
+  updateSetFilterSummary();
+
+  $("btn-toggle-sets-panel")?.addEventListener("click", () => {
+    const panel = $("scanner-sets-panel");
+    if (!panel) return;
+    panel.classList.toggle("hidden");
+    if (!panel.classList.contains("hidden")) {
+      loadAvailableScannerSets();
+    }
+  });
+
+  $("btn-clear-scanner-sets")?.addEventListener("click", () => {
+    selectedScannerSets.clear();
+    saveSelectedSetsToStorage();
+    updateSetFilterSummary();
+    renderScannerSetsList();
+    sendSetFilterToWs();
+  });
+
+  $("scanner-sets-search")?.addEventListener("input", renderScannerSetsList);
+}
+
+async function loadAvailableScannerSets() {
+  if (setsLoaded && availableScannerSets.length > 0) {
+    renderScannerSetsList();
+    return;
+  }
+  renderScannerSetsList();
+  try {
+    const resp = await fetch(`${SCANNER_HTTP_BASE}/sets`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (Array.isArray(data)) {
+      availableScannerSets = data;
+      setsLoaded = true;
+      renderScannerSetsList();
+    }
+  } catch {
+    // ritenterà alla prossima apertura
+  }
+}
+
 // Navigazione tab in basso
 document.querySelectorAll(".nav-btn").forEach((btn) => {
   btn.addEventListener("click", async () => {
@@ -98,6 +274,8 @@ document.querySelectorAll(".nav-btn").forEach((btn) => {
     $(targetTab).classList.add("active");
 
     if (targetTab === "tab-collection") {
+      ensureSetSelectorUi();
+      loadAvailableScannerSets();
       await ensureCameraAndWs();
     } else {
       stopScannerSession();
@@ -763,23 +941,28 @@ function connectScannerWs() {
     setScanStateBadge("Inquadra una carta");
     setScannerConnectionUi("Connesso", "connected", true);
     setStatus($("collection-status"), "Connesso al server scanner!", "ok");
+    sendSetFilterToWs();
     startFrameLoop();
   };
 
   socket.onmessage = (ev) => {
-    awaitingServerReply = false;
-    if (pendingProposalCard) return;
-
     let payload = null;
     try {
       payload = JSON.parse(ev.data);
     } catch {
+      awaitingServerReply = false;
       return;
     }
 
+    if (payload && payload.type === "filter_ack") {
+      return;
+    }
+
+    awaitingServerReply = false;
+    if (pendingProposalCard) return;
+
     if (!payload || !payload.detected) {
       drawQuadOverlay(null, false);
-      // Appena la carta viene tolta dall'inquadratura, sblocca per la prossima
       if (lockedAfterConfirmCard) {
         lockedAfterConfirmCard = null;
       }
@@ -789,7 +972,6 @@ function connectScannerWs() {
 
     const matches = Array.isArray(payload.matches) ? payload.matches : [];
 
-    // Se è bloccato sull'ultima carta confermata, controlla se l'utente ha cambiato carta
     if (lockedAfterConfirmCard) {
       const stillSameCard = matches.some((m) => {
         const idKey = String(m.scryfall_id || "").toLowerCase();
@@ -806,7 +988,6 @@ function connectScannerWs() {
         return;
       }
 
-      // Ha inquadrato una carta diversa: sblocca automaticamente
       lockedAfterConfirmCard = null;
     }
 
@@ -965,6 +1146,7 @@ $("btn-reset-rejected")?.addEventListener("click", () => {
 });
 
 async function ensureCameraAndWs() {
+  ensureSetSelectorUi();
   updateRejectedBadge();
 
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -1002,6 +1184,7 @@ async function ensureCameraAndWs() {
     connectScannerWs();
   } else if (wsConn.readyState === WebSocket.OPEN) {
     setScannerConnectionUi("Connesso", "connected", true);
+    sendSetFilterToWs();
     startFrameLoop();
   }
 }
